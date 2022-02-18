@@ -1,1 +1,1 @@
-export type { ApiReturnType } from './api';
+export type { ApiReturnType, NutritionType } from './api';

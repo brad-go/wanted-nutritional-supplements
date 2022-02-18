@@ -1,9 +1,8 @@
 export interface ApiReturnType {
-  nutritionList: ApiReturnType[];
+  nutritionList: NutritionType[];
 }
 
-export interface ApiReturnType {
-  id: number;
-  product: string;
-  brand: string;
+export interface NutritionType {
+  productName: string;
+  brand: string | null;
 }
