@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import styled, { css } from 'styled-components';
 import { IconButton, Tab, Tabs, TextField } from '@mui/material';
 import { List, ListItem } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
-import type { NutritionType } from '~types/index';
+import { type NutritionType, SearchType } from '~types/index';
+import { createFuzzyMatcher } from '~utils/index';
+import { fetchApi } from '~api/index';
 
 function a11yProps(index: number) {
   return {
@@ -13,32 +15,95 @@ function a11yProps(index: number) {
 }
 
 function App() {
-  const [searchType, setType] = useState(0);
+  const [data, setData] = useState<NutritionType[]>([]);
+  const [searchType, setSearchType] = useState<SearchType>(SearchType.PRODUCT);
   const [inputValue, setInputValue] = useState('');
+  const [preview, setPreview] = useState<string[]>([]);
   const [result, setResult] = useState<NutritionType[]>([]);
-
   const [dropdownActive, setDropdownActive] = React.useState<boolean>(false);
+
+  // 브랜드: SK 케미칼, 뉴트리라이트, 동국제약, 풀무원 로하스, 풀무원건강생활, 일양약품, 유한메디카, 라이프 익스텐션
+  const search = (value: string) => {
+    if (searchType === SearchType.PRODUCT) {
+      return data.filter((product) =>
+        // 소문자 영어도 검색할 수 있도록 소문자 변환
+        createFuzzyMatcher(value.toLowerCase()).test(
+          product.productName.toLowerCase(),
+        ),
+      );
+    }
+    return data
+      .filter((one) => one.brand !== null)
+      .filter((product) =>
+        // 소문자 영어도 검색할 수 있도록 소문자 변환
+        createFuzzyMatcher(value.toLowerCase()).test(
+          product.brand!.toLowerCase(),
+        ),
+      );
+  };
 
   const handleFocus = () => {
     setDropdownActive(true);
   };
 
-  const handleBlur = () => {
+  const handleClose = () => {
     setDropdownActive(false);
   };
 
   const handleTypeChange = (e: React.SyntheticEvent<Element, Event>) => {
     const target = e.target as HTMLButtonElement;
-    setType(Number(target.id.substring(target.id.length - 1)));
+    setSearchType(Number(target.id.substring(target.id.length - 1)));
+    setInputValue('');
+    setResult([]);
+    setPreview([]);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!dropdownActive) {
+      setDropdownActive(true);
+    }
     setInputValue(e.target.value);
+    const value = e.target.value;
+    if (e.target.value === '') {
+      setPreview([]);
+      return;
+    }
+    const result = search(value);
+    if (searchType === SearchType.PRODUCT) {
+      setPreview(result.map(({ productName }) => productName));
+      return;
+    }
+    setPreview(
+      Array.from(
+        new Set(
+          result
+            .map(({ brand }) => brand)
+            .filter((one) => one !== null) as string[],
+        ),
+      ),
+    );
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setResult(search(inputValue));
+    setDropdownActive(false);
   };
+
+  const handlePreviewClick = (e: React.MouseEvent) => {
+    const value = (e.target as HTMLButtonElement).innerText;
+    setInputValue(value);
+    setResult(search(value));
+    setDropdownActive(false);
+  };
+
+  useEffect(() => {
+    const getData = async () => {
+      const { nutritionList } = await fetchApi();
+      setData(nutritionList);
+    };
+    getData();
+  }, []);
 
   return (
     <Wrapper>
@@ -58,12 +123,12 @@ function App() {
               <TextField
                 variant="standard"
                 placeholder={`검색할 ${
-                  searchType === 0 ? '제품명을' : '브랜드를'
+                  searchType === SearchType.PRODUCT ? '제품명을' : '브랜드를'
                 } 입력하세요.`}
                 value={inputValue}
                 onChange={handleInputChange}
                 onFocus={handleFocus}
-                onBlur={handleBlur}
+                // onBlur={handleBlur}
                 autoComplete="off"
                 fullWidth
               />
@@ -73,22 +138,25 @@ function App() {
             </InputContainer>
           </div>
           {dropdownActive && (
-            <DropdownContainer dropdownActive={dropdownActive}>
-              <List disablePadding>
-                {result.length ? (
-                  result.slice(0, 8).map(({ productName }) => (
-                    <ListItem key={productName} disablePadding>
-                      <ListButton type="submit">
-                        <SearchIcon color="primary" />
-                        {productName}
-                      </ListButton>
-                    </ListItem>
-                  ))
-                ) : (
-                  <BlankContainer>검색결과 없음</BlankContainer>
-                )}
-              </List>
-            </DropdownContainer>
+            <>
+              <DropdownContainer dropdownActive={dropdownActive}>
+                <List disablePadding>
+                  {preview.length ? (
+                    preview.slice(0, 8).map((name) => (
+                      <ListItem key={name} disablePadding>
+                        <ListButton onClick={handlePreviewClick}>
+                          <SearchIcon color="primary" />
+                          {name}
+                        </ListButton>
+                      </ListItem>
+                    ))
+                  ) : (
+                    <BlankContainer>검색결과 없음</BlankContainer>
+                  )}
+                </List>
+              </DropdownContainer>
+              <Backdrop onClick={handleClose} />
+            </>
           )}
         </FormContainer>
         <ResultContainer>
@@ -173,6 +241,7 @@ const InputContainer = styled.div<{ dropdownActive: boolean }>`
 
 const DropdownContainer = styled.div<{ dropdownActive: boolean }>`
   position: absolute;
+  z-index: 1001;
   width: calc(100% - 32px);
   padding: 0 12px;
   padding-bottom: 8px;
@@ -185,6 +254,16 @@ const DropdownContainer = styled.div<{ dropdownActive: boolean }>`
           background-color: white;
         `
       : css``}
+`;
+
+const Backdrop = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1000;
+  opacity: 0;
 `;
 
 const ListButton = styled.button`
