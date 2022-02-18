@@ -1,26 +1,14 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  IconButton,
-  Tab,
-  Tabs,
-  TextField,
-  List,
-  ListItem,
-  Chip,
-} from '@mui/material';
+import React, { useEffect, useRef, useState } from 'react';
+import { IconButton, Tab, Tabs, TextField } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
-import styled, { css } from 'styled-components';
-import { PRODUCT_KEYWORDS, BRAND_KEYWORDS, COLORS } from '~constants/index';
+import { ProductItem, BlankContainer, Dropdown } from '~components/index';
+import { COLORS } from '~constants/index';
+import useDropdown from '~hooks/useDropdown';
 import { type NutritionType, SearchType } from '~types/index';
 import { createFuzzyMatcher } from '~utils/index';
 import { fetchApi } from '~api/index';
-
-function a11yProps(index: number) {
-  return {
-    id: `simple-tab-${index}`,
-    'aria-controls': `simple-tabpanel-${index}`,
-  };
-}
+import styled, { css } from 'styled-components';
+import useIntersect from '~hooks/useIntersect';
 
 function App() {
   const [data, setData] = useState<NutritionType[]>([]);
@@ -29,10 +17,19 @@ function App() {
   const [result, setResult] = useState<NutritionType[]>([]);
   const [list, setList] = useState<NutritionType[]>([]);
   const [inputValue, setInputValue] = useState('');
-  const [dropdownActive, setDropdownActive] = React.useState<boolean>(false);
   const timerId = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [target, setTarget] = useState(null);
-  const [isEnd, setIsEnd] = useState<boolean>(false);
+  const { dropdownActive, handleDropdownOpen, handleDropdownClose } =
+    useDropdown();
+
+  const renew = () => {
+    setList((prev) => {
+      const arr = result.slice(prev.length, prev.length + 10);
+      if (arr.length < 10) setIsEnd(true);
+      return prev.concat(arr);
+    });
+  };
+
+  const { setTarget, isEnd, setIsEnd } = useIntersect(renew, [renew, result]);
 
   const sortResult = (arr: NutritionType[], val: string, regex: RegExp) => {
     const result = arr.map((one) => {
@@ -94,17 +91,11 @@ function App() {
     return sortResult(result, value, regex);
   };
 
-  const handleFocus = () => {
-    setDropdownActive(true);
-  };
-
-  const handleClose = () => {
-    setDropdownActive(false);
-  };
-
   const handleTypeChange = (e: React.SyntheticEvent<Element, Event>) => {
-    const target = e.target as HTMLButtonElement;
-    setSearchType(Number(target.id.substring(target.id.length - 1)));
+    const { id } = e.target as HTMLButtonElement;
+    setSearchType(
+      id.includes('product') ? SearchType.PRODUCT : SearchType.BRAND,
+    );
     setInputValue('');
     setResult([]);
     setPreview([]);
@@ -113,7 +104,7 @@ function App() {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     if (!dropdownActive) {
-      setDropdownActive(true);
+      handleDropdownOpen();
     }
     setInputValue(value);
 
@@ -135,45 +126,19 @@ function App() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setResult(search(inputValue));
-    setDropdownActive(false);
     setList([]);
     setIsEnd(false);
+    handleDropdownClose();
   };
 
   const handlePreviewClick = (e: React.MouseEvent) => {
     const value = (e.target as HTMLButtonElement).innerText;
     setInputValue(value);
-    setDropdownActive(false);
+    setResult(search(value));
     setList([]);
     setIsEnd(false);
-    setResult(search(value));
+    handleDropdownClose();
   };
-
-  const onIntersect: IntersectionObserverCallback = useCallback(
-    async ([entry], observer) => {
-      if (entry.isIntersecting && !isEnd) {
-        observer.unobserve(entry.target);
-        setList((prev) => {
-          const arr = result.slice(prev.length, prev.length + 10);
-          if (arr.length < 10) setIsEnd(true);
-          return prev.concat(arr);
-        });
-        observer.observe(entry.target);
-      }
-    },
-    [isEnd, result],
-  );
-
-  useEffect(() => {
-    let observer: IntersectionObserver;
-    if (target) {
-      observer = new IntersectionObserver(onIntersect, {
-        threshold: 0.1,
-      });
-      observer.observe(target);
-    }
-    return () => observer && observer.disconnect();
-  }, [target, onIntersect]);
 
   useEffect(() => {
     const getData = async () => {
@@ -194,8 +159,16 @@ function App() {
               onChange={handleTypeChange}
               aria-label="영양제 검색"
             >
-              <Tab label="제품명 검색" {...a11yProps(0)} />
-              <Tab label="브랜드 검색" {...a11yProps(1)} />
+              <Tab
+                label="제품명 검색"
+                id="search-product"
+                aria-controls="search-product-panel"
+              />
+              <Tab
+                label="브랜드 검색"
+                id="search-brand"
+                aria-controls="search-brand-panel"
+              />
             </Tabs>
             <InputContainer dropdownActive={dropdownActive}>
               <TextField
@@ -205,7 +178,7 @@ function App() {
                 } 입력하세요.`}
                 value={inputValue}
                 onChange={handleInputChange}
-                onFocus={handleFocus}
+                onFocus={handleDropdownOpen}
                 autoComplete="off"
                 fullWidth
               />
@@ -216,38 +189,13 @@ function App() {
           </div>
           {dropdownActive && (
             <>
-              <DropdownContainer>
-                <List disablePadding>
-                  {preview.length ? (
-                    preview.slice(0, 8).map((name) => (
-                      <ListItem key={name} disablePadding>
-                        <ListButton onClick={handlePreviewClick}>
-                          <SearchIcon color="primary" />
-                          {name}
-                        </ListButton>
-                      </ListItem>
-                    ))
-                  ) : (
-                    <BlankContainer>
-                      검색 결과가 없습니다. 아래의 추천 키워드로 검색해보세요!
-                      <ChipContainer>
-                        {inputValue.length === 0 &&
-                          (searchType === SearchType.PRODUCT
-                            ? PRODUCT_KEYWORDS
-                            : BRAND_KEYWORDS
-                          ).map((name) => (
-                            <Chip
-                              key={name}
-                              label={name}
-                              onClick={handlePreviewClick}
-                            />
-                          ))}
-                      </ChipContainer>
-                    </BlankContainer>
-                  )}
-                </List>
-              </DropdownContainer>
-              <Backdrop onClick={handleClose} />
+              <Dropdown
+                preview={preview}
+                inputValue={inputValue}
+                searchType={searchType}
+                onClick={handlePreviewClick}
+              />
+              <Backdrop onClick={handleDropdownClose} />
             </>
           )}
         </FormContainer>
@@ -255,12 +203,12 @@ function App() {
           {result.length ? (
             <div>
               {list.map(({ productName, brand }) => (
-                <a href="/#" key={productName}>
-                  <ProductItem>
-                    <h3>{productName}</h3>
-                    <p>{brand || ' '}</p>
-                  </ProductItem>
-                </a>
+                <ProductItem
+                  key={productName}
+                  title={productName}
+                  subtitle={brand}
+                  href="/#"
+                />
               ))}
               {!isEnd && (
                 <LoadingContainer
@@ -338,18 +286,6 @@ const InputContainer = styled.div<{ dropdownActive: boolean }>`
         `}
 `;
 
-const DropdownContainer = styled.div`
-  position: absolute;
-  z-index: 1001;
-  width: calc(100% - 32px);
-  padding: 0 12px;
-  padding-bottom: 8px;
-  border-bottom-left-radius: 30px;
-  border-bottom-right-radius: 30px;
-  box-shadow: 0px 10px 10px rgba(0, 0, 0, 0.3);
-  background-color: ${COLORS.WHITE};
-`;
-
 const Backdrop = styled.div`
   position: absolute;
   top: 0;
@@ -358,21 +294,6 @@ const Backdrop = styled.div`
   height: 100vh;
   z-index: 1000;
   opacity: 0;
-`;
-
-const ListButton = styled.button`
-  display: flex;
-  align-items: center;
-  width: 100%;
-  gap: 1em;
-  padding: 0.5em;
-  cursor: pointer;
-  border-radius: 1em;
-  transition: background-color 0.25s;
-
-  &:hover {
-    background-color: ${COLORS.LIGHT_GREY};
-  }
 `;
 
 const ResultContainer = styled.section`
@@ -407,55 +328,11 @@ const ResultContainer = styled.section`
   }
 `;
 
-const ProductItem = styled.article`
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  min-height: 5em;
-  margin: 0 1em;
-  border-bottom: solid 1px ${COLORS.GREY_BORDER};
-
-  h3 {
-    font-weight: 600;
-    line-height: 1.5em;
-  }
-
-  p {
-    color: ${COLORS.GREY};
-  }
-
-  h3,
-  p {
-    width: 100%;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-`;
-
 const LoadingContainer = styled.div<{ ref: any }>`
   display: flex;
   justify-content: center;
   align-items: center;
   color: ${COLORS.GREY};
-`;
-
-const BlankContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 2em;
-  padding: 5em 0;
-  color: ${COLORS.GREY};
-`;
-
-const ChipContainer = styled.div`
-  display: flex;
-  justify-content: center;
-  gap: 0.5em 1em;
-  padding: 0 3em;
-  flex-wrap: wrap;
 `;
 
 export default App;
