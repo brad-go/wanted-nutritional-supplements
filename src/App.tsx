@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
+import styled, { css } from 'styled-components';
 import { IconButton, Tab, Tabs, TextField } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import { ProductItem, BlankContainer, Dropdown } from '~components/index';
 import { COLORS } from '~constants/index';
-import useDropdown from '~hooks/useDropdown';
 import { type NutritionType, SearchType } from '~types/index';
-import { createFuzzyMatcher } from '~utils/index';
+import { createFuzzyMatcher, sortResult } from '~utils/index';
 import { fetchApi } from '~api/index';
-import styled, { css } from 'styled-components';
+import useDropdown from '~hooks/useDropdown';
 import useIntersect from '~hooks/useIntersect';
 
 function App() {
@@ -31,54 +31,28 @@ function App() {
 
   const { setTarget, isEnd, setIsEnd } = useIntersect(renew, [renew, result]);
 
-  const sortResult = (arr: NutritionType[], val: string, regex: RegExp) => {
-    const result = arr.map((one) => {
-      const { productName, brand } = one;
-      let longestDistance = 0;
-      one[searchType === SearchType.PRODUCT ? 'productName' : 'brand']!.replace(
-        regex,
-        (match: string, ...group: string[]) => {
-          const letters = group.slice(0, val.length);
-          let lastIndex = 0;
-          for (let i = 0, l = letters.length; i < l; i++) {
-            const idx = match.indexOf(letters[i], lastIndex);
-            if (lastIndex > 0) {
-              longestDistance = Math.max(longestDistance, idx - lastIndex);
-            }
-            lastIndex = idx + 1;
-          }
-          return match;
-        },
-      );
-      return {
-        productName,
-        brand,
-        longestDistance,
-      };
-    });
-    return result
-      .sort((a, b) => a.longestDistance - b.longestDistance)
-      .map(({ productName, brand }) => ({ productName, brand }));
-  };
-
   const search = (value: string) => {
     const regex = createFuzzyMatcher(value.toLowerCase());
     if (searchType === SearchType.PRODUCT) {
-      const result = sortResult(
-        data.filter((product) => regex.test(product.productName.toLowerCase())),
-        value,
+      const result = sortResult({
+        arr: data.filter((product) =>
+          regex.test(product.productName.toLowerCase()),
+        ),
+        val: value,
         regex,
-      );
+        searchType,
+      });
       setPreview(result.map(({ productName }) => productName));
       return result;
     }
-    const result = sortResult(
-      data
+    const result = sortResult({
+      arr: data
         .filter((one) => one.brand !== null)
         .filter((product) => regex.test(product.brand!.toLowerCase())),
-      value,
+      val: value,
       regex,
-    );
+      searchType,
+    });
     setPreview(
       Array.from(
         new Set(
@@ -88,7 +62,7 @@ function App() {
         ),
       ),
     );
-    return sortResult(result, value, regex);
+    return result;
   };
 
   const handleTypeChange = (e: React.SyntheticEvent<Element, Event>) => {
@@ -273,6 +247,10 @@ const InputContainer = styled.div<{ dropdownActive: boolean }>`
   margin-top: 1em;
   padding-bottom: 2px;
   background-color: ${COLORS.WHITE};
+  button {
+    margin-top: -5px;
+    margin-right: -5px;
+  }
   ${(props) =>
     props.dropdownActive
       ? css`

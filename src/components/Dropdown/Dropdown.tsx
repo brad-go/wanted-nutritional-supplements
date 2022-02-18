@@ -26,7 +26,7 @@ const Dropdown = ({
             <ListItem key={name} disablePadding>
               <ListButton onClick={onClick}>
                 <SearchIcon color="primary" />
-                {name}
+                <span>{name}</span>
               </ListButton>
             </ListItem>
           ))
@@ -70,6 +70,12 @@ const ListButton = styled.button`
   cursor: pointer;
   border-radius: 1em;
   transition: background-color 0.25s;
+
+  span {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
 
   &:hover {
     background-color: ${COLORS.LIGHT_GREY};

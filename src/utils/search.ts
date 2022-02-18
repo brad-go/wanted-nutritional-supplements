@@ -1,4 +1,5 @@
 import escapeRegExp from 'lodash/escapeRegExp';
+import { SearchType, NutritionType } from '~types/index';
 
 export const createFuzzyMatcher = (input: string) => {
   const pattern = input
@@ -53,3 +54,40 @@ export const changeToPattern = (ch: string) => {
 
 // 문자열에서 정규표현식 만들어줌 Hello\?!\*`~World\(\)\[\]
 // console.log(escapeRegExp("Hello?!*`~World()[]"));
+
+interface SortResultArgs {
+  arr: NutritionType[];
+  val: string;
+  regex: RegExp;
+  searchType: SearchType;
+}
+
+export const sortResult = ({ arr, val, regex, searchType }: SortResultArgs) => {
+  const result = arr.map((one) => {
+    const { productName, brand } = one;
+    let longestDistance = 0;
+    one[searchType === SearchType.PRODUCT ? 'productName' : 'brand']!.replace(
+      regex,
+      (match: string, ...group: string[]) => {
+        const letters = group.slice(0, val.length);
+        let lastIndex = 0;
+        for (let i = 0, l = letters.length; i < l; i++) {
+          const idx = match.indexOf(letters[i], lastIndex);
+          if (lastIndex > 0) {
+            longestDistance = Math.max(longestDistance, idx - lastIndex);
+          }
+          lastIndex = idx + 1;
+        }
+        return match;
+      },
+    );
+    return {
+      productName,
+      brand,
+      longestDistance,
+    };
+  });
+  return result
+    .sort((a, b) => a.longestDistance - b.longestDistance)
+    .map(({ productName, brand }) => ({ productName, brand }));
+};
