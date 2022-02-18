@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import styled, { css } from 'styled-components';
 import { IconButton, Tab, Tabs, TextField } from '@mui/material';
 import { List, ListItem } from '@mui/material';
@@ -21,12 +21,11 @@ function App() {
   const [preview, setPreview] = useState<string[]>([]);
   const [result, setResult] = useState<NutritionType[]>([]);
   const [dropdownActive, setDropdownActive] = React.useState<boolean>(false);
+  const timerId = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 브랜드: SK 케미칼, 뉴트리라이트, 동국제약, 풀무원 로하스, 풀무원건강생활, 일양약품, 유한메디카, 라이프 익스텐션
   const search = (value: string) => {
     if (searchType === SearchType.PRODUCT) {
       return data.filter((product) =>
-        // 소문자 영어도 검색할 수 있도록 소문자 변환
         createFuzzyMatcher(value.toLowerCase()).test(
           product.productName.toLowerCase(),
         ),
@@ -35,7 +34,6 @@ function App() {
     return data
       .filter((one) => one.brand !== null)
       .filter((product) =>
-        // 소문자 영어도 검색할 수 있도록 소문자 변환
         createFuzzyMatcher(value.toLowerCase()).test(
           product.brand!.toLowerCase(),
         ),
@@ -59,29 +57,38 @@ function App() {
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
     if (!dropdownActive) {
       setDropdownActive(true);
     }
-    setInputValue(e.target.value);
-    const value = e.target.value;
-    if (e.target.value === '') {
+    setInputValue(value);
+
+    if (timerId.current) {
+      clearTimeout(timerId.current);
+    }
+
+    if (value === '') {
       setPreview([]);
       return;
     }
-    const result = search(value);
-    if (searchType === SearchType.PRODUCT) {
-      setPreview(result.map(({ productName }) => productName));
-      return;
-    }
-    setPreview(
-      Array.from(
-        new Set(
-          result
-            .map(({ brand }) => brand)
-            .filter((one) => one !== null) as string[],
+
+    timerId.current = setTimeout(() => {
+      const result = search(value);
+      timerId.current = null;
+      if (searchType === SearchType.PRODUCT) {
+        setPreview(result.map(({ productName }) => productName));
+        return;
+      }
+      setPreview(
+        Array.from(
+          new Set(
+            result
+              .map(({ brand }) => brand)
+              .filter((one) => one !== null) as string[],
+          ),
         ),
-      ),
-    );
+      );
+    }, 200);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
