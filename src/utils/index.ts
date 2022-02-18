@@ -1,1 +1,1 @@
-export {};
+export { createFuzzyMatcher, changeToPattern } from './search';
