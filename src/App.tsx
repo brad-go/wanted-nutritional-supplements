@@ -34,26 +34,54 @@ function App() {
   const [target, setTarget] = useState(null);
   const [isEnd, setIsEnd] = useState<boolean>(false);
 
+  const sortResult = (arr: NutritionType[], val: string, regex: RegExp) => {
+    const result = arr.map((one) => {
+      const { productName, brand } = one;
+      let longestDistance = 0;
+      one[searchType === SearchType.PRODUCT ? 'productName' : 'brand']!.replace(
+        regex,
+        (match: string, ...group: string[]) => {
+          const letters = group.slice(0, val.length);
+          let lastIndex = 0;
+          for (let i = 0, l = letters.length; i < l; i++) {
+            const idx = match.indexOf(letters[i], lastIndex);
+            if (lastIndex > 0) {
+              longestDistance = Math.max(longestDistance, idx - lastIndex);
+            }
+            lastIndex = idx + 1;
+          }
+          return match;
+        },
+      );
+      return {
+        productName,
+        brand,
+        longestDistance,
+      };
+    });
+    return result
+      .sort((a, b) => a.longestDistance - b.longestDistance)
+      .map(({ productName, brand }) => ({ productName, brand }));
+  };
+
   const search = (value: string) => {
-    setDropdownActive(false);
-    setList([]);
-    setIsEnd(false);
+    const regex = createFuzzyMatcher(value.toLowerCase());
     if (searchType === SearchType.PRODUCT) {
-      const result = data.filter((product) =>
-        createFuzzyMatcher(value.toLowerCase()).test(
-          product.productName.toLowerCase(),
-        ),
+      const result = sortResult(
+        data.filter((product) => regex.test(product.productName.toLowerCase())),
+        value,
+        regex,
       );
       setPreview(result.map(({ productName }) => productName));
       return result;
     }
-    const result = data
-      .filter((one) => one.brand !== null)
-      .filter((product) =>
-        createFuzzyMatcher(value.toLowerCase()).test(
-          product.brand!.toLowerCase(),
-        ),
-      );
+    const result = sortResult(
+      data
+        .filter((one) => one.brand !== null)
+        .filter((product) => regex.test(product.brand!.toLowerCase())),
+      value,
+      regex,
+    );
     setPreview(
       Array.from(
         new Set(
@@ -63,7 +91,7 @@ function App() {
         ),
       ),
     );
-    return result;
+    return sortResult(result, value, regex);
   };
 
   const handleFocus = () => {
@@ -100,18 +128,24 @@ function App() {
 
     timerId.current = setTimeout(() => {
       timerId.current = null;
-      setResult(search(value));
+      search(value);
     }, 200);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setResult(search(inputValue));
+    setDropdownActive(false);
+    setList([]);
+    setIsEnd(false);
   };
 
   const handlePreviewClick = (e: React.MouseEvent) => {
     const value = (e.target as HTMLButtonElement).innerText;
     setInputValue(value);
+    setDropdownActive(false);
+    setList([]);
+    setIsEnd(false);
     setResult(search(value));
   };
 
@@ -383,6 +417,7 @@ const ProductItem = styled.article`
 
   h3 {
     font-weight: 600;
+    line-height: 1.5em;
   }
 
   p {

@@ -1,7 +1,11 @@
 import escapeRegExp from 'lodash/escapeRegExp';
 
 export const createFuzzyMatcher = (input: string) => {
-  const pattern = input.split('').map(changeToPattern).join('.*?');
+  const pattern = input
+    .split('')
+    .map(changeToPattern)
+    .map((pattern) => '(' + pattern + ')')
+    .join('.*?');
   return new RegExp(pattern);
 };
 
