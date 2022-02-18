@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   IconButton,
   Tab,
@@ -10,7 +10,7 @@ import {
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import styled, { css } from 'styled-components';
-import { PRODUCT_KEYWORDS, BRAND_KEYWORDS } from '~constants/index';
+import { PRODUCT_KEYWORDS, BRAND_KEYWORDS, COLORS } from '~constants/index';
 import { type NutritionType, SearchType } from '~types/index';
 import { createFuzzyMatcher } from '~utils/index';
 import { fetchApi } from '~api/index';
@@ -25,27 +25,45 @@ function a11yProps(index: number) {
 function App() {
   const [data, setData] = useState<NutritionType[]>([]);
   const [searchType, setSearchType] = useState<SearchType>(SearchType.PRODUCT);
-  const [inputValue, setInputValue] = useState('');
   const [preview, setPreview] = useState<string[]>([]);
   const [result, setResult] = useState<NutritionType[]>([]);
+  const [list, setList] = useState<NutritionType[]>([]);
+  const [inputValue, setInputValue] = useState('');
   const [dropdownActive, setDropdownActive] = React.useState<boolean>(false);
   const timerId = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [target, setTarget] = useState(null);
+  const [isEnd, setIsEnd] = useState<boolean>(false);
 
   const search = (value: string) => {
+    setDropdownActive(false);
+    setList([]);
+    setIsEnd(false);
     if (searchType === SearchType.PRODUCT) {
-      return data.filter((product) =>
+      const result = data.filter((product) =>
         createFuzzyMatcher(value.toLowerCase()).test(
           product.productName.toLowerCase(),
         ),
       );
+      setPreview(result.map(({ productName }) => productName));
+      return result;
     }
-    return data
+    const result = data
       .filter((one) => one.brand !== null)
       .filter((product) =>
         createFuzzyMatcher(value.toLowerCase()).test(
           product.brand!.toLowerCase(),
         ),
       );
+    setPreview(
+      Array.from(
+        new Set(
+          result
+            .map(({ brand }) => brand)
+            .filter((one) => one !== null) as string[],
+        ),
+      ),
+    );
+    return result;
   };
 
   const handleFocus = () => {
@@ -81,36 +99,47 @@ function App() {
     }
 
     timerId.current = setTimeout(() => {
-      const result = search(value);
       timerId.current = null;
-      if (searchType === SearchType.PRODUCT) {
-        setPreview(result.map(({ productName }) => productName));
-        return;
-      }
-      setPreview(
-        Array.from(
-          new Set(
-            result
-              .map(({ brand }) => brand)
-              .filter((one) => one !== null) as string[],
-          ),
-        ),
-      );
+      setResult(search(value));
     }, 200);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setResult(search(inputValue));
-    setDropdownActive(false);
   };
 
   const handlePreviewClick = (e: React.MouseEvent) => {
     const value = (e.target as HTMLButtonElement).innerText;
     setInputValue(value);
     setResult(search(value));
-    setDropdownActive(false);
   };
+
+  const onIntersect: IntersectionObserverCallback = useCallback(
+    async ([entry], observer) => {
+      if (entry.isIntersecting && !isEnd) {
+        observer.unobserve(entry.target);
+        setList((prev) => {
+          const arr = result.slice(prev.length, prev.length + 10);
+          if (arr.length < 10) setIsEnd(true);
+          return prev.concat(arr);
+        });
+        observer.observe(entry.target);
+      }
+    },
+    [isEnd, result],
+  );
+
+  useEffect(() => {
+    let observer: IntersectionObserver;
+    if (target) {
+      observer = new IntersectionObserver(onIntersect, {
+        threshold: 0.1,
+      });
+      observer.observe(target);
+    }
+    return () => observer && observer.disconnect();
+  }, [target, onIntersect]);
 
   useEffect(() => {
     const getData = async () => {
@@ -153,7 +182,7 @@ function App() {
           </div>
           {dropdownActive && (
             <>
-              <DropdownContainer dropdownActive={dropdownActive}>
+              <DropdownContainer>
                 <List disablePadding>
                   {preview.length ? (
                     preview.slice(0, 8).map((name) => (
@@ -191,7 +220,7 @@ function App() {
         <ResultContainer>
           {result.length ? (
             <div>
-              {result.map(({ productName, brand }) => (
+              {list.map(({ productName, brand }) => (
                 <a href="/#" key={productName}>
                   <ProductItem>
                     <h3>{productName}</h3>
@@ -199,6 +228,13 @@ function App() {
                   </ProductItem>
                 </a>
               ))}
+              {!isEnd && (
+                <LoadingContainer
+                  ref={setTarget as React.LegacyRef<HTMLDivElement>}
+                >
+                  loading...
+                </LoadingContainer>
+              )}
             </div>
           ) : (
             <BlankContainer>검색 결과가 없습니다.</BlankContainer>
@@ -214,7 +250,7 @@ const Wrapper = styled.main`
   align-items: center;
   width: 100%;
   height: 100vh;
-  color: #1b1b2d;
+  color: ${COLORS.BLACK};
 `;
 
 const Container = styled.div`
@@ -225,7 +261,7 @@ const Container = styled.div`
   height: 80%;
   margin: 0 auto;
   border-radius: 12px;
-  background-color: #efca61;
+  background-color: ${COLORS.POINT};
   box-shadow: 8px 42px 80px rgba(0, 0, 0, 0.1);
   overflow: hidden;
 
@@ -254,11 +290,11 @@ const InputContainer = styled.div<{ dropdownActive: boolean }>`
   padding: 8px 12px 0 20px;
   margin-top: 1em;
   padding-bottom: 2px;
-  background-color: white;
+  background-color: ${COLORS.WHITE};
   ${(props) =>
     props.dropdownActive
       ? css`
-          background-color: white;
+          background-color: ${COLORS.WHITE};
           border: none;
           border-top-left-radius: 25px;
           border-top-right-radius: 25px;
@@ -268,7 +304,7 @@ const InputContainer = styled.div<{ dropdownActive: boolean }>`
         `}
 `;
 
-const DropdownContainer = styled.div<{ dropdownActive: boolean }>`
+const DropdownContainer = styled.div`
   position: absolute;
   z-index: 1001;
   width: calc(100% - 32px);
@@ -276,13 +312,8 @@ const DropdownContainer = styled.div<{ dropdownActive: boolean }>`
   padding-bottom: 8px;
   border-bottom-left-radius: 30px;
   border-bottom-right-radius: 30px;
-  box-shadow: 0px 10px 10px rgba(0, 0, 0, 0.4);
-  ${(props) =>
-    props.dropdownActive
-      ? css`
-          background-color: white;
-        `
-      : css``}
+  box-shadow: 0px 10px 10px rgba(0, 0, 0, 0.3);
+  background-color: ${COLORS.WHITE};
 `;
 
 const Backdrop = styled.div`
@@ -306,7 +337,7 @@ const ListButton = styled.button`
   transition: background-color 0.25s;
 
   &:hover {
-    background-color: #eee;
+    background-color: ${COLORS.LIGHT_GREY};
   }
 `;
 
@@ -314,7 +345,7 @@ const ResultContainer = styled.section`
   padding: 1em 1em 1em 1em;
   width: 100%;
   height: 100%;
-  background-color: #fff;
+  background-color: ${COLORS.WHITE};
   overflow-y: auto;
 
   ::-webkit-scrollbar {
@@ -323,7 +354,7 @@ const ResultContainer = styled.section`
 
   ::-webkit-scrollbar-thumb {
     border-radius: 0.25em;
-    background-color: #ccc;
+    background-color: ${COLORS.GREY_BORDER};
   }
 
   ::-webkit-scrollbar-track {
@@ -348,14 +379,14 @@ const ProductItem = styled.article`
   justify-content: center;
   min-height: 5em;
   margin: 0 1em;
-  border-bottom: solid 1px #ddd;
+  border-bottom: solid 1px ${COLORS.GREY_BORDER};
 
   h3 {
     font-weight: 600;
   }
 
   p {
-    color: #aaa;
+    color: ${COLORS.GREY};
   }
 
   h3,
@@ -367,6 +398,13 @@ const ProductItem = styled.article`
   }
 `;
 
+const LoadingContainer = styled.div<{ ref: any }>`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: ${COLORS.GREY};
+`;
+
 const BlankContainer = styled.div`
   display: flex;
   flex-direction: column;
@@ -374,7 +412,7 @@ const BlankContainer = styled.div`
   align-items: center;
   gap: 2em;
   padding: 5em 0;
-  color: #aaa;
+  color: ${COLORS.GREY};
 `;
 
 const ChipContainer = styled.div`
