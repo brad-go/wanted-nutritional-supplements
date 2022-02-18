@@ -1,8 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
-import styled, { css } from 'styled-components';
-import { IconButton, Tab, Tabs, TextField } from '@mui/material';
-import { List, ListItem } from '@mui/material';
+import {
+  IconButton,
+  Tab,
+  Tabs,
+  TextField,
+  List,
+  ListItem,
+  Chip,
+} from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
+import styled, { css } from 'styled-components';
+import { PRODUCT_KEYWORDS, BRAND_KEYWORDS } from '~constants/index';
 import { type NutritionType, SearchType } from '~types/index';
 import { createFuzzyMatcher } from '~utils/index';
 import { fetchApi } from '~api/index';
@@ -135,7 +143,6 @@ function App() {
                 value={inputValue}
                 onChange={handleInputChange}
                 onFocus={handleFocus}
-                // onBlur={handleBlur}
                 autoComplete="off"
                 fullWidth
               />
@@ -158,7 +165,22 @@ function App() {
                       </ListItem>
                     ))
                   ) : (
-                    <BlankContainer>검색결과 없음</BlankContainer>
+                    <BlankContainer>
+                      검색 결과가 없습니다. 아래의 추천 키워드로 검색해보세요!
+                      <ChipContainer>
+                        {inputValue.length === 0 &&
+                          (searchType === SearchType.PRODUCT
+                            ? PRODUCT_KEYWORDS
+                            : BRAND_KEYWORDS
+                          ).map((name) => (
+                            <Chip
+                              key={name}
+                              label={name}
+                              onClick={handlePreviewClick}
+                            />
+                          ))}
+                      </ChipContainer>
+                    </BlankContainer>
                   )}
                 </List>
               </DropdownContainer>
@@ -347,10 +369,20 @@ const ProductItem = styled.article`
 
 const BlankContainer = styled.div`
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
+  gap: 2em;
   padding: 5em 0;
   color: #aaa;
+`;
+
+const ChipContainer = styled.div`
+  display: flex;
+  justify-content: center;
+  gap: 0.5em 1em;
+  padding: 0 3em;
+  flex-wrap: wrap;
 `;
 
 export default App;
