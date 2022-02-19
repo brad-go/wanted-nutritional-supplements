@@ -125,7 +125,10 @@ function App() {
   return (
     <Wrapper>
       <Container>
-        <h1>영양제 검색</h1>
+        <h1>
+          <LogoImage src="/contentLogo.png" alt="logo" />
+          Find My Supplement
+        </h1>
         <FormContainer onSubmit={handleSubmit}>
           <div>
             <Tabs
@@ -224,7 +227,7 @@ const Container = styled.div`
   > h1 {
     margin: 36px 0 8px 0;
     text-align: center;
-    font-size: 20px;
+    font-size: 24px;
     font-weight: 500;
   }
 
@@ -233,6 +236,11 @@ const Container = styled.div`
     height: 100vh;
     box-shadow: none;
   }
+`;
+
+const LogoImage = styled.img`
+  width: 20px;
+  margin-right: 8px;
 `;
 
 const FormContainer = styled.form`
@@ -245,7 +253,7 @@ const InputContainer = styled.div<{ dropdownActive: boolean }>`
   display: flex;
   padding: 8px 12px 0 20px;
   margin-top: 1em;
-  padding-bottom: 2px;
+  padding-bottom: 4px;
   background-color: ${COLORS.WHITE};
   button {
     margin-top: -5px;
@@ -256,8 +264,8 @@ const InputContainer = styled.div<{ dropdownActive: boolean }>`
       ? css`
           background-color: ${COLORS.WHITE};
           border: none;
-          border-top-left-radius: 25px;
-          border-top-right-radius: 25px;
+          border-top-left-radius: 23px;
+          border-top-right-radius: 23px;
         `
       : css`
           border-radius: 30px;
