@@ -168,7 +168,6 @@ function App() {
             <>
               <Dropdown
                 preview={preview}
-                inputValue={inputValue}
                 searchType={searchType}
                 onClick={handlePreviewClick}
               />
