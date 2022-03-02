@@ -7,17 +7,11 @@ import styled from 'styled-components';
 
 interface DropdownProps {
   preview: string[];
-  inputValue: string;
   searchType: SearchType;
   onClick: React.MouseEventHandler;
 }
 
-const Dropdown = ({
-  preview,
-  inputValue,
-  searchType,
-  onClick,
-}: DropdownProps) => {
+const Dropdown = ({ preview, searchType, onClick }: DropdownProps) => {
   return (
     <DropdownContainer>
       <List disablePadding>
@@ -34,13 +28,12 @@ const Dropdown = ({
           <BlankContainer>
             검색 결과가 없습니다. 아래의 추천 키워드로 검색해보세요!
             <ChipContainer>
-              {inputValue.length === 0 &&
-                (searchType === SearchType.PRODUCT
-                  ? PRODUCT_KEYWORDS
-                  : BRAND_KEYWORDS
-                ).map((name) => (
-                  <Chip key={name} label={name} onClick={onClick} />
-                ))}
+              {(searchType === SearchType.PRODUCT
+                ? PRODUCT_KEYWORDS
+                : BRAND_KEYWORDS
+              ).map((name) => (
+                <Chip key={name} label={name} onClick={onClick} />
+              ))}
             </ChipContainer>
           </BlankContainer>
         )}
